@@ -44,10 +44,21 @@ class GP_MCMC:
         
     def sample(self):
         self.m.optimize(max_iters=100, messages=True)
-        hmc    = GPy.inference.mcmc.HMC(self.m,stepsize=1e-1)
-        s      = hmc.sample(num_samples=self.burnin) # Burnin
-        s      = hmc.sample(num_samples=self.n_samples * self.subsample_interval)
-        self.s = s[0::self.subsample_interval]
+        hmc     = GPy.inference.mcmc.HMC(self.m,stepsize=1e-1)
+        s       = hmc.sample(num_samples=self.burnin) # Burnin
+        s       = hmc.sample(num_samples=self.n_samples * self.subsample_interval)
+        self.s  = s[0::self.subsample_interval]
+        self.ms = []
+        for i in range(self.s.shape[0]):
+            samp_kern = GPy.kern.Matern52(input_dim = self.dim, ARD = True)
+            samp_m    = GPy.models.GPRegression(self.train_x, self.train_y, samp_kern)
+            samp_m[:] = self.s[i]
+            samp_m._trigger_params_changed()
+            self.ms = np.append(self.ms, samp_m)
+
+        print(self.s)
+        for sm in self.ms:
+            print(sm)
 
     def set_kappa(self):
         t = 1 + int(self.num_train / self.B)
@@ -67,10 +78,11 @@ class GP_MCMC:
         pys         = np.zeros((num_samples, 1));
         pss         = np.zeros((num_samples, 1));
         for i in range(num_samples):
-            hyp       = self.s[i]
-            self.m[:] = hyp
-            self.m._trigger_params_changed()
-            m, v = self.m.predict(x.reshape(1, x.size))
+            # hyp       = self.s[i]
+            # self.m[:] = hyp
+            # self.m._trigger_params_changed()
+            # m, v = self.m.predict(x.reshape(1, x.size))
+            m, v   = self.ms[i].predict(x.reshape(1, x.size))
             pys[i] = m[0][0]
             pss[i] = v[0][0]
         pys = self.mean + (pys * self.std)
@@ -105,11 +117,11 @@ class GP_MCMC:
         num_samples = pys.shape[0]
         acq = 0;
         for i in range(num_samples):
-            y            = pys[i]
-            s            = pss[i]
-            phi, Phi, u  = get_quantiles(self.eps, self.tau, y, s)
-            f_acqu       = Phi
-            acq         += f_acqu
+            y          = pys[i]
+            s          = pss[i]
+            _, Phi, _  = get_quantiles(self.eps, self.tau, y, s)
+            f_acqu     = Phi
+            acq       += f_acqu
         acq /= self.s.shape[0]
         return acq
 
