@@ -57,7 +57,7 @@ class GP_MCMC:
         self.m.kern.variance       = hyp_vec[0]
         self.m.kern.lengthscale    = hyp_vec[1:1+self.dim]
         self.m.likelihood.variance = hyp_vec[1+self.dim]
-        py, ps2                    = self.m.predict(x.reshape(x.size, 1))
+        py, ps2                    = self.m.predict(x.reshape(1, x.size))
         py                         = self.mean + (py * self.std)
         ps2                        = ps2 * (self.std**2)
         return py, ps2;
@@ -67,10 +67,14 @@ class GP_MCMC:
         pys         = np.zeros((num_samples, 1));
         pss         = np.zeros((num_samples, 1));
         for i in range(num_samples):
-            hyp     = self.s[i]
-            py, ps2 = self.predict_sample(x, hyp)
-            pys[i]  = py[0][0]
-            pss[i]  = ps2[0][0]
+            hyp       = self.s[i]
+            self.m[:] = hyp
+            self.m._trigger_params_changed()
+            m, v = self.m.predict(x.reshape(1, x.size))
+            pys[i] = m[0][0]
+            pss[i] = v[0][0]
+        pys = self.mean + (pys * self.std)
+        pss = pss * (self.std**2)
         return pys, np.sqrt(pss)
 
     def LCB(self, x, pys, pss):
