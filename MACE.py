@@ -55,7 +55,7 @@ class MACE:
                 y = self.f(x)
                 self.dbx = np.concatenate((self.dbx, x.reshape(1, x.size)), axis=0)
                 self.dby = np.concatenate((self.dby, y.reshape(1, 1)), axis=0)
-            print("iter %d, evaluated: %d, best is %g" % (iter, dby.size, np.min(self.dby)))
+            print("iter %d, evaluated: %d, best is %g" % (iter, self.dby.size, np.min(self.dby)))
             pf = np.array([s.objectives for s in algorithm.result])
             ps = np.array([s.variables  for s in algorithm.result])
             np.savetxt('pf', pf)
