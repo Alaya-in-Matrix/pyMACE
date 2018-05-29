@@ -28,8 +28,8 @@ class GP_MCMC:
         self.m.likelihood.variance = 1e-2 * np.var(self.train_y)
 
         # self.m.kern.variance.set_prior(GPy.priors.Gamma.from_EV(2, 4))
-        self.m.kern.variance.set_prior(GPy.priors.Gamma.from_EV(np.var(self.train_y), 1000))
-        self.m.likelihood.variance.set_prior(GPy.priors.Gamma.from_EV(2, 4))
+        self.m.kern.variance.set_prior(GPy.priors.Gamma.from_EV(1, 4))
+        self.m.likelihood.variance.set_prior(GPy.priors.Gamma.from_EV(1, 4))
         self.m.kern.lengthscale.set_prior(GPy.priors.Gamma.from_EV(2, 4))
 
         self.eps     = 1e-3;

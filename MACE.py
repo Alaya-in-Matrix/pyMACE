@@ -47,7 +47,7 @@ class MACE:
                 problem.types[i] = Real(self.lb[i], self.ub[i])
             problem.function = obj
             algorithm        = NSGAII(problem, population_size=100)
-            algorithm.run(10000)
+            algorithm.run(25000)
 
             idxs = np.random.randint(0, len(algorithm.result), self.B)
             for i in idxs:

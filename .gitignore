@@ -2,6 +2,11 @@
 # vim swap file
 *.swp
 work/
+dbx
+dby
+ps
+pf
+log
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
