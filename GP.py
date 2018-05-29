@@ -43,7 +43,7 @@ class GP_MCMC:
         self.sample()
         
     def sample(self):
-        self.m.optimize(max_iters=100, messages=True)
+        self.m.optimize(max_iters=200, messages=False)
         hmc     = GPy.inference.mcmc.HMC(self.m,stepsize=1e-1)
         s       = hmc.sample(num_samples=self.burnin) # Burnin
         s       = hmc.sample(num_samples=self.n_samples * self.subsample_interval)
@@ -55,10 +55,6 @@ class GP_MCMC:
             samp_m[:] = self.s[i]
             samp_m._trigger_params_changed()
             self.ms = np.append(self.ms, samp_m)
-
-        print(self.s)
-        for sm in self.ms:
-            print(sm)
 
     def set_kappa(self):
         t = 1 + int(self.num_train / self.B)

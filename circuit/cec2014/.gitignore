@@ -1,0 +1,8 @@
+# ignore file for CEC14 testbench
+CMakeFiles/
+cec2014expensive
+cmake_install.cmake
+CMakeCache.txt
+param
+result.po
+*.swp

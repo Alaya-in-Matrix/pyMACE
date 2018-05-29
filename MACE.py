@@ -1,21 +1,6 @@
 from GP import GP_MCMC
 import numpy as np
 from platypus import NSGAII, Problem, Real, SPEA2, NSGAIII
-# from platypus import NSGAII, Problem, Real, SPEA2, NSGAIII
-# import numpy as np
-
-# def schaffer(x):
-#     return [x[0]**2, (x[0]-2)**2]
-
-# problem = Problem(1, 2)
-# problem.types[:] = Real(-10, 10)
-# problem.function = schaffer
-
-# algorithm = NSGAII(problem)
-# for r in algorithm.result:
-#     print(np.array(r.variables))
-#     print(np.array(r.objectives))
-#     print("-----------")
 
 class MACE:
     def __init__(self, f, lb, ub, num_init, max_iter, B):
@@ -41,25 +26,22 @@ class MACE:
         self.dby = np.zeros((self.num_init, 1))
         # TODO: the initialization can be paralleled
         for i in range(self.num_init):
-            x = np.random.uniform(self.lb, self.ub).reshape(self.dim)
-            y = self.f(x)
+            x           = np.random.uniform(self.lb, self.ub).reshape(self.dim)
+            y           = self.f(x)
             self.dbx[i] = x;
             self.dby[i] = y;
         print('Initialized, best is %g' % np.min(self.dby))
-        print(self.dbx)
-        print(self.dby)
 
     def optimize(self):
         for iter in range(self.max_iter):
             self.model = GP_MCMC(self.dbx, self.dby, self.B)
+            print("GP built")
+            print(self.model.m)
 
             def obj(x):
                 lcb, ei, pi = self.model.MACE_acq(np.array([x]))
-                print(lcb, ei, pi)
                 return [lcb[0], -1*ei[0], -1*pi[0]]
 
-            print(self.model.m)
-            print(self.model.dim)
             problem = Problem(self.dim, 3)
             for i in range(self.dim):
                 problem.types[i] = Real(self.lb[i], self.ub[i])
@@ -73,8 +55,10 @@ class MACE:
                 y = self.f(x)
                 self.dbx = np.concatenate((self.dbx, x.reshape(1, x.size)), axis=0)
                 self.dby = np.concatenate((self.dby, y.reshape(1, 1)), axis=0)
-            print("iter %d, best is %g" % (iter, np.min(self.dby)))
+            print("iter %d, evaluated: %d, best is %g" % (iter, dby.size, np.min(self.dby)))
             pf = np.array([s.objectives for s in algorithm.result])
             ps = np.array([s.variables  for s in algorithm.result])
             np.savetxt('pf', pf)
             np.savetxt('ps', ps)
+            np.savetxt('dbx', self.dbx)
+            np.savetxt('dby', self.dby)
