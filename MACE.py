@@ -80,10 +80,10 @@ class MACE:
             np.savetxt('dby', self.dby)
 
             if self.debug:
+                best_lcb, best_ei, best_pi = self.model.MACE_acq(self.best_x)
                 f.write('MAP model:\n%s\n' % str(self.model.m))
                 f.write('Best x,  LCB: %g, EI: %g, PI: %g\n' % (best_lcb[0], best_ei[0], best_pi[0]))
                 f.write('Tau = %g, eps = %g, kappa = %g, ystd = %g, ymean = %g\n' % (self.model.tau, self.model.eps, self.model.kappa, self.model.std, self.model.mean))
-                best_lcb, best_ei, best_pi = self.model.MACE_acq(self.best_x)
                 for i in range(len(ps)):
                     x      = ps[i, :]
                     fx     = self.f(x)
