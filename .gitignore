@@ -4,8 +4,8 @@
 work/
 dbx
 dby
-ps
-pf
+ps*
+pf*
 log
 
 # Byte-compiled / optimized / DLL files

@@ -2,10 +2,11 @@ import GPy
 from GPyOpt.util.general import get_quantiles
 import numpy as np
 from math import pow, log, sqrt
+from sobol import *
 
 # TODO: standardize the training data
 class GP_MCMC:
-    def __init__(self, train_x, train_y, B):
+    def __init__(self, train_x, train_y, B, num_init):
         
         self.mean = np.mean(train_y);
         self.std  = np.std(train_y);
@@ -15,6 +16,7 @@ class GP_MCMC:
         self.num_train = self.train_x.shape[0]
         self.dim       = self.train_x.shape[1]
         self.B         = B
+        self.num_init  = num_init
 
         kern           = GPy.kern.Matern52(input_dim = self.dim, ARD = True)
         self.m         = GPy.models.GPRegression(self.train_x, self.train_y, kern)
@@ -27,24 +29,23 @@ class GP_MCMC:
         self.m.kern.lengthscale    = np.std(self.train_x, 0)
         self.m.likelihood.variance = 1e-2 * np.var(self.train_y)
 
-        # self.m.kern.variance.set_prior(GPy.priors.Gamma.from_EV(2, 4))
-        self.m.kern.variance.set_prior(GPy.priors.Gamma.from_EV(1, 4))
-        self.m.likelihood.variance.set_prior(GPy.priors.Gamma.from_EV(1, 4))
-        self.m.kern.lengthscale.set_prior(GPy.priors.Gamma.from_EV(2, 4))
+        self.m.kern.variance.set_prior(GPy.priors.LogGaussian(0, 1))
+        self.m.likelihood.variance.set_prior(GPy.priors.Gamma.from_EV(0.02, 4))
+        self.m.kern.lengthscale.set_prior(GPy.priors.LogGaussian(0, 10))
 
         self.eps     = 1e-3;
         self.upsilon = 0.5;
         self.delta   = 0.05
         self.tau     = np.min(train_y)
 
-        self.burnin             = 100
-        self.n_samples          = 20
+        self.burnin             = 200
+        self.n_samples          = 30
         self.subsample_interval = 10
         self.sample()
         
     def sample(self):
         self.m.optimize(max_iters=200, messages=False)
-        hmc     = GPy.inference.mcmc.HMC(self.m,stepsize=1e-1)
+        hmc     = GPy.inference.mcmc.HMC(self.m,stepsize=5e-2)
         s       = hmc.sample(num_samples=self.burnin) # Burnin
         s       = hmc.sample(num_samples=self.n_samples * self.subsample_interval)
         self.s  = s[0::self.subsample_interval]
@@ -56,9 +57,6 @@ class GP_MCMC:
             samp_m._trigger_params_changed()
             self.ms = np.append(self.ms, samp_m)
 
-    def set_kappa(self):
-        t = 1 + int(self.num_train / self.B)
-        self.kappa = sqrt(self.upsilon * 2 * log(pow(t, 2.0 + self.dim / 2.0) * 3 * pow(np.pi, 2) / (3 * self.delta)));
 
     def predict_sample(self, x, hyp_vec):
         self.m.kern.variance       = hyp_vec[0]
@@ -68,6 +66,11 @@ class GP_MCMC:
         py                         = self.mean + (py * self.std)
         ps2                        = ps2 * (self.std**2)
         return py, ps2;
+
+    def set_kappa(self):
+        num_train  = self.num_train
+        t          = 1 + int((num_train - self.num_init) / self.B)
+        self.kappa = sqrt(self.upsilon * 2 * log(pow(t, 2.0 + self.dim / 2.0) * 3 * pow(np.pi, 2) / (3 * self.delta)));
 
     def predict(self, x):
         num_samples = self.s.shape[0]
