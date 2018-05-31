@@ -2,6 +2,7 @@ from GP import GP_MCMC
 import numpy as np
 from platypus import NSGAII, MOEAD, Problem, Real, SPEA2, NSGAIII
 from math import pow, log, sqrt
+from scipy.special import erfc
 import os
 
 class MACE:
@@ -82,13 +83,14 @@ class MACE:
             if self.debug:
                 best_lcb, best_ei, best_pi = self.model.MACE_acq(self.best_x)
                 f.write('MAP model:\n%s\n' % str(self.model.m))
-                f.write('Best x,  LCB: %g, EI: %g, PI: %g\n' % (best_lcb[0], best_ei[0], best_pi[0]))
+                f.write('Best x,  LCB: %g, EI: %g, PI: %g\n' % (best_lcb[0], best_ei[0], 0.5 * erfc(-1 * best_pi[0] / np.sqrt(2))))
                 f.write('Tau = %g, eps = %g, kappa = %g, ystd = %g, ymean = %g\n' % (self.model.tau, self.model.eps, self.model.kappa, self.model.std, self.model.mean))
                 for i in range(len(ps)):
                     x      = ps[i, :]
                     fx     = self.f(x)
                     f.write('True value: %g\n' % fx)
                     acq    = pf[i, :]
+                    acq[2] = 0.5 * erfc(-1 * acq[2] / np.sqrt(2))
                     predy, preds = self.model.predict(x)
                     f.write('PY: ' + str(predy.reshape(predy.size)) + '\n')
                     f.write('PS: ' + str(preds.reshape(preds.size)) + '\n')
