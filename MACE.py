@@ -1,6 +1,6 @@
 from GP import GP_MCMC
 import numpy as np
-from platypus import NSGAII, MOEAD, Problem, Real, SPEA2, NSGAIII
+from platypus import NSGAII, MOEAD, Problem, Real, SPEA2, NSGAIII, Solution, InjectedPopulation
 from math import pow, log, sqrt
 from scipy.special import erfc
 import os
@@ -52,14 +52,22 @@ class MACE:
 
             def obj(x):
                 lcb, ei, pi = self.model.MACE_acq(np.array([x]))
-                return [lcb[0], -1*ei[0], -1*pi[0]]
+                log_ei      = np.log(1e-40 + ei)
+                log_pi      = np.log(1e-40 + pi)
+                return [lcb[0], -1*log_ei[0], -1*log_pi[0]]
 
             problem = Problem(self.dim, 3)
             for i in range(self.dim):
                 problem.types[i] = Real(self.lb[i], self.ub[i])
+
+            # The current best solution as an initial guess of the NSGAIII population
+            s = Solution(problem);
+            for i in range(self.dim):
+                s.variables[i] = np.maximum(self.lb[i], np.minimum(self.ub[i], 1e-3 * np.random.randn() + self.best_x[i]))
+
             problem.function = obj
             # algorithm        = MOEAD(problem, population_size=100)
-            algorithm        = NSGAIII(problem, divisions_outer=12, population_size=100)
+            algorithm        = NSGAIII(problem, divisions_outer=12, generator = InjectedPopulation([s]))
             # algorithm        = CMAES(problem, epsilons=0.05, population_size=100)
             algorithm.run(25000)
 
@@ -83,14 +91,15 @@ class MACE:
             if self.debug:
                 best_lcb, best_ei, best_pi = self.model.MACE_acq(self.best_x)
                 f.write('MAP model:\n%s\n' % str(self.model.m))
-                f.write('Best x,  LCB: %g, EI: %g, PI: %g\n' % (best_lcb[0], best_ei[0], 0.5 * erfc(-1 * best_pi[0] / np.sqrt(2))))
+                f.write('Best x,  LCB: %g, EI: %g, PI: %g\n' % (best_lcb[0], best_ei[0], best_pi[0]))
                 f.write('Tau = %g, eps = %g, kappa = %g, ystd = %g, ymean = %g\n' % (self.model.tau, self.model.eps, self.model.kappa, self.model.std, self.model.mean))
                 for i in range(len(ps)):
                     x      = ps[i, :]
                     fx     = self.f(x)
                     f.write('True value: %g\n' % fx)
                     acq    = pf[i, :]
-                    acq[2] = 0.5 * erfc(-1 * acq[2] / np.sqrt(2))
+                    acq[1] = np.exp(-1 * acq[1]) # from -1*log_ei to ei
+                    acq[2] = np.exp(-1 * acq[2]) # from -1*log_pi to pi
                     predy, preds = self.model.predict(x)
                     f.write('PY: ' + str(predy.reshape(predy.size)) + '\n')
                     f.write('PS: ' + str(preds.reshape(preds.size)) + '\n')

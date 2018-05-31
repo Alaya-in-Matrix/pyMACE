@@ -118,8 +118,8 @@ class GP_MCMC:
         for i in range(num_samples):
             y          = pys[i]
             s          = pss[i]
-            _, _, u  = get_quantiles(self.eps, self.tau, y, s)
-            f_acqu     = u
+            _, Phi, _  = get_quantiles(self.eps, self.tau, y, s)
+            f_acqu     = Phi
             acq       += f_acqu
         acq /= self.s.shape[0]
         return acq
