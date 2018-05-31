@@ -3,10 +3,11 @@ import numpy as np
 from platypus import NSGAII, MOEAD, Problem, Real, SPEA2, NSGAIII, Solution, InjectedPopulation
 from math import pow, log, sqrt
 from scipy.special import erfc
+from sobol_seq import i4_sobol_generate
 import os
 
 class MACE:
-    def __init__(self, f, lb, ub, num_init, max_iter, B, debug=True):
+    def __init__(self, f, lb, ub, num_init, max_iter, B, debug=True, sobol_init=True):
         """
         f: the objective function:
             input: D row vector
@@ -17,32 +18,37 @@ class MACE:
         max_iter: number of iterations
         B: batch size, the total number of function evaluations would be num_init + B * max_iter
         """
-        self.f        = f
-        self.lb       = lb.reshape(lb.size)
-        self.ub       = ub.reshape(ub.size)
-        self.dim      = self.lb.size
-        self.num_init = num_init
-        self.max_iter = max_iter
-        self.B        = B
-        self.debug    = debug
+        self.f          = f
+        self.lb         = lb.reshape(lb.size)
+        self.ub         = ub.reshape(ub.size)
+        self.dim        = self.lb.size
+        self.num_init   = num_init
+        self.max_iter   = max_iter
+        self.B          = B
+        self.debug      = debug
+        self.sobol_init = sobol_init
 
     def init(self):
         self.dbx = np.zeros((self.num_init, self.dim))
-        self.dby = np.zeros((self.num_init, 1))
-        # TODO: the initialization can be paralleled
+        if self.sobol_init:
+            self.dbx = (self.ub - self.lb) * i4_sobol_generate(self.dim, self.num_init) +  self.lb
+        else:
+            self.dbx = np.random.uniform(self.lb, self.ub, (self.num_init, self.dim))
+
+        self.dby    = np.zeros((self.num_init, 1))
         self.best_y = np.inf
         for i in range(self.num_init):
-            x           = np.random.uniform(self.lb, self.ub).reshape(self.dim)
-            y           = self.f(x)
+            y = self.f(self.dbx[i])
             if y < self.best_y:
                 self.best_y = y
-                self.best_x = x
-            self.dbx[i] = x;
+                self.best_x = self.dbx[i]
             self.dby[i] = y;
-        print('Initialized, best is %g' % np.min(self.dby))
+        np.savetxt('dbx', self.dbx)
+        np.savetxt('dby', self.dby)
+        print('Initialized, best is %g' % self.best_y)
 
     def optimize(self):
-        os.system("rm -f dbx dby pf* ps* opt.log")
+        os.system("rm -f pf* ps* opt.log")
         f           = open('opt.log', 'w');
         self.best_y = np.min(self.dby)
         for iter in range(self.max_iter):
@@ -61,14 +67,20 @@ class MACE:
                 problem.types[i] = Real(self.lb[i], self.ub[i])
 
             # The current best solution as an initial guess of the NSGAIII population
-            s = Solution(problem);
+            s1 = Solution(problem);
+            s2 = Solution(problem);
+            s3 = Solution(problem);
             for i in range(self.dim):
-                s.variables[i] = np.maximum(self.lb[i], np.minimum(self.ub[i], 1e-3 * np.random.randn() + self.best_x[i]))
+                s1.variables[i] = np.maximum(self.lb[i], np.minimum(self.ub[i], self.best_x[i]))
+                s2.variables[i] = np.maximum(self.lb[i], np.minimum(self.ub[i], 1e-3 * np.random.randn() + self.best_x[i]))
+                s3.variables[i] = np.maximum(self.lb[i], np.minimum(self.ub[i], 1e-3 * np.random.randn() + self.dbx[-1, i]))
 
             problem.function = obj
-            # algorithm        = MOEAD(problem, population_size=100)
-            algorithm        = NSGAIII(problem, divisions_outer=12, generator = InjectedPopulation([s]))
-            # algorithm        = CMAES(problem, epsilons=0.05, population_size=100)
+            gen              = InjectedPopulation([s1, s2, s3])
+            # algorithm        = MOEAD(problem, population_size=100, generator = gen)
+            algorithm        = NSGAIII(problem, divisions_outer=12, generator = gen)
+            # algorithm        = NSGAII(problem, generator = gen)
+            # algorithm        = CMAES(problem, epsilons=0.05, population_size=100, generator = gen)
             algorithm.run(25000)
 
             idxs = np.random.randint(0, len(algorithm.result), self.B)
@@ -81,8 +93,12 @@ class MACE:
                 self.dbx = np.concatenate((self.dbx, x.reshape(1, x.size)), axis=0)
                 self.dby = np.concatenate((self.dby, y.reshape(1, 1)), axis=0)
             f.write("Iter %d, evaluated: %d, best is %g\n" % (iter, self.dby.size, np.min(self.dby)))
-            pf = np.array([s.objectives for s in algorithm.result])
-            ps = np.array([s.variables  for s in algorithm.result])
+            pf       = np.array([s.objectives for s in algorithm.result])
+            ps       = np.array([s.variables  for s in algorithm.result])
+            self.pf  = pf;
+            self.ps  = ps;
+            pf[:, 1] = np.exp(-1 * pf[:, 1]) # from -1*log_ei to ei
+            pf[:, 2] = np.exp(-1 * pf[:, 2]) # from -1*log_pi to pi
             np.savetxt('pf%d' % iter, pf)
             np.savetxt('ps%d' % iter, ps)
             np.savetxt('dbx', self.dbx)
@@ -98,11 +114,9 @@ class MACE:
                     fx     = self.f(x)
                     f.write('True value: %g\n' % fx)
                     acq    = pf[i, :]
-                    acq[1] = np.exp(-1 * acq[1]) # from -1*log_ei to ei
-                    acq[2] = np.exp(-1 * acq[2]) # from -1*log_pi to pi
                     predy, preds = self.model.predict(x)
-                    f.write('PY: ' + str(predy.reshape(predy.size)) + '\n')
-                    f.write('PS: ' + str(preds.reshape(preds.size)) + '\n')
-                    f.write('ACQ:' + str(acq)                       + '\n')
+                    f.write('PY:  ' + str(predy.reshape(predy.size)) + '\n')
+                    f.write('PS:  ' + str(preds.reshape(preds.size)) + '\n')
+                    f.write('ACQ: ' + str(acq)                       + '\n')
                     f.write('---------------\n')
         f.close()

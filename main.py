@@ -10,8 +10,8 @@ import sys
 import os
 
 
-argv = sys.argv[1:]
-conf = toml.load(argv[0])
+# argv = sys.argv[1:]
+conf = toml.load("conf.toml")
 
 batch_size = conf["batch_size"]
 bounds     = np.array(conf["bounds"])
@@ -19,6 +19,7 @@ max_iter   = conf["max_iter"]
 num_cores  = conf["num_cores"]
 num_init   = conf["num_init"]
 var_name   = conf["var_name"]
+use_sobol  = conf["use_sobol"]
 
 os.system("rm -rf work")
 os.system("mkdir work")
@@ -43,7 +44,7 @@ print(f(lb))
 print(f(ub))
 
 
-optimizer = MACE(f, lb, ub, num_init, max_iter, batch_size);
+optimizer = MACE(f, lb, ub, num_init, max_iter, batch_size, sobol_init = use_sobol);
 optimizer.init()
 optimizer.optimize()
 
