@@ -3,6 +3,7 @@ import numpy as np
 from platypus import NSGAII, MOEAD, Problem, Real, SPEA2, NSGAIII, Solution, InjectedPopulation
 from math import pow, log, sqrt
 from scipy.special import erfc
+from scipy.optimize import fmin_l_bfgs_b
 from sobol_seq import i4_sobol_generate
 import os
 
@@ -47,6 +48,33 @@ class MACE:
         np.savetxt('dby', self.dby)
         print('Initialized, best is %g' % self.best_y)
 
+    def gen_guess(self):
+        num_guess     = np.minimum(10, len(self.model.ms));
+        guess_x       = np.zeros((num_guess, self.dim))
+        guess_x[0, :] = self.best_x
+        guess_x[1, :] = self.dbx[-1, :]
+
+        def obj(x, m):
+            m, _    = m.predict(x[None, :])
+            return m
+        def gobj(x, m):
+            dmdx, _ = m.predictive_gradients(x[None, :])
+            return dmdx
+
+        bounds = [(self.lb[i], self.ub[i]) for i in range(self.dim)]
+        for i in range(2, num_guess):
+            m  = self.model.ms[i]
+            xx = self.best_x + np.random.randn(self.best_x.size).reshape(self.best_x.shape) * 1e-3
+            def mobj(x):
+                return obj(x, m)
+            def gmobj(x):
+                return gobj(x, m)
+            x, _, _ = fmin_l_bfgs_b(mobj, xx, gmobj, bounds=bounds)
+            guess_x[i, :] = np.array(x)
+        return guess_x
+
+
+
     def optimize(self):
         os.system("rm -f pf* ps* opt.log")
         f           = open('opt.log', 'w');
@@ -55,6 +83,9 @@ class MACE:
             self.model = GP_MCMC(self.dbx, self.dby, self.B, self.num_init)
             print("GP built")
             print(self.model.m)
+
+            guess_x   = self.gen_guess()
+            num_guess = guess_x.shape[0]
 
             def obj(x):
                 lcb, ei, pi = self.model.MACE_acq(np.array([x]))
@@ -67,16 +98,12 @@ class MACE:
                 problem.types[i] = Real(self.lb[i], self.ub[i])
 
             # The current best solution as an initial guess of the NSGAIII population
-            s1 = Solution(problem);
-            s2 = Solution(problem);
-            s3 = Solution(problem);
-            for i in range(self.dim):
-                s1.variables[i] = np.maximum(self.lb[i], np.minimum(self.ub[i], self.best_x[i]))
-                s2.variables[i] = np.maximum(self.lb[i], np.minimum(self.ub[i], 1e-3 * np.random.randn() + self.best_x[i]))
-                s3.variables[i] = np.maximum(self.lb[i], np.minimum(self.ub[i], 1e-3 * np.random.randn() + self.dbx[-1, i]))
+            init_s = [Solution(problem) for i in range(num_guess)]
+            for i in range(num_guess):
+                init_s[i].variables = [x for x in guess_x[i, :]]
 
             problem.function = obj
-            gen              = InjectedPopulation([s1, s2, s3])
+            gen              = InjectedPopulation(init_s)
             # algorithm        = MOEAD(problem, population_size=100, generator = gen)
             algorithm        = NSGAIII(problem, divisions_outer=12, generator = gen)
             # algorithm        = NSGAII(problem, generator = gen)
