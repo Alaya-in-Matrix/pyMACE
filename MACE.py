@@ -5,7 +5,7 @@ from math import pow, log, sqrt
 from scipy.special import erfc
 from scipy.optimize import fmin_l_bfgs_b
 from sobol_seq import i4_sobol_generate
-import os
+import os, sys
 
 class MACE:
     def __init__(self, f, lb, ub, num_init, max_iter, B, debug=True, sobol_init=True):
@@ -97,7 +97,6 @@ class MACE:
             for i in range(self.dim):
                 problem.types[i] = Real(self.lb[i], self.ub[i])
 
-            # The current best solution as an initial guess of the NSGAIII population
             init_s = [Solution(problem) for i in range(num_guess)]
             for i in range(num_guess):
                 init_s[i].variables = [x for x in guess_x[i, :]]
@@ -105,10 +104,12 @@ class MACE:
             problem.function = obj
             gen              = InjectedPopulation(init_s)
             # algorithm        = MOEAD(problem, population_size=100, generator = gen)
-            algorithm        = NSGAIII(problem, divisions_outer=12, generator = gen)
-            # algorithm        = NSGAII(problem, generator = gen)
+            # algorithm        = NSGAIII(problem, divisions_outer=12, generator = gen)
             # algorithm        = CMAES(problem, epsilons=0.05, population_size=100, generator = gen)
-            algorithm.run(25000)
+            algorithm = NSGAII(problem, population = 100, generator = gen)
+            def cb(a):
+                print(a.nfe, flush=True)
+            algorithm.run(25000, callback=cb)
 
             idxs = np.random.randint(0, len(algorithm.result), self.B)
             for i in idxs:
@@ -119,7 +120,6 @@ class MACE:
                     self.best_x = x
                 self.dbx = np.concatenate((self.dbx, x.reshape(1, x.size)), axis=0)
                 self.dby = np.concatenate((self.dby, y.reshape(1, 1)), axis=0)
-            f.write("Iter %d, evaluated: %d, best is %g\n" % (iter, self.dby.size, np.min(self.dby)))
             pf       = np.array([s.objectives for s in algorithm.result])
             ps       = np.array([s.variables  for s in algorithm.result])
             self.pf  = pf;
@@ -132,18 +132,26 @@ class MACE:
             np.savetxt('dby', self.dby)
 
             if self.debug:
+                f.write("After iter %d, evaluated: %d, best is %g\n" % (iter, self.dby.size, np.min(self.dby)))
                 best_lcb, best_ei, best_pi = self.model.MACE_acq(self.best_x)
-                f.write('MAP model:\n%s\n' % str(self.model.m))
                 f.write('Best x,  LCB: %g, EI: %g, PI: %g\n' % (best_lcb[0], best_ei[0], best_pi[0]))
                 f.write('Tau = %g, eps = %g, kappa = %g, ystd = %g, ymean = %g\n' % (self.model.tau, self.model.eps, self.model.kappa, self.model.std, self.model.mean))
-                for i in range(len(ps)):
-                    x      = ps[i, :]
-                    fx     = self.f(x)
-                    f.write('True value: %g\n' % fx)
-                    acq    = pf[i, :]
-                    predy, preds = self.model.predict(x)
-                    f.write('PY:  ' + str(predy.reshape(predy.size)) + '\n')
-                    f.write('PS:  ' + str(preds.reshape(preds.size)) + '\n')
-                    f.write('ACQ: ' + str(acq)                       + '\n')
+                evaled_x  = self.dbx[-1*self.B:, :]
+                evaled_y  = self.dby[-1*self.B:]
+                evaled_pf = self.pf[-1*self.B:, :]
+
+                for i in range(self.B):
+                    predy, preds = self.model.predict(evaled_x[i, :]);
+                    predy        = predy.reshape(predy.size);
+                    preds        = preds.reshape(preds.size);
+                    pred         = [(predy[ii], preds[ii]) for ii in range(predy.size)]
+                    f.write('X:    ')
+                    for d in range(self.dim):
+                        f.write(' ' + str(evaled_x[i, d]) + ' ');
+                    f.write('\n');
+                    f.write('Y:    '   + str(evaled_y[i, 0])      + '\n');
+                    f.write('ACQ:  '   + str(evaled_pf[i, :])  + '\n');
+                    f.write('Pred:\n'  + str(np.array(pred)) + '\n');
                     f.write('---------------\n')
+                f.flush()
         f.close()
