@@ -8,7 +8,7 @@ from sobol_seq import i4_sobol_generate
 import os, sys
 
 class MACE:
-    def __init__(self, f, lb, ub, num_init, max_iter, B, debug=True, sobol_init=True):
+    def __init__(self, f, lb, ub, num_init, max_iter, B, debug=True, sobol_init=True, mo_eval = 25000):
         """
         f: the objective function:
             input: D row vector
@@ -28,6 +28,7 @@ class MACE:
         self.B          = B
         self.debug      = debug
         self.sobol_init = sobol_init
+        self.mo_eval    = mo_eval
 
     def init(self):
         self.dbx = np.zeros((self.num_init, self.dim))
@@ -109,7 +110,7 @@ class MACE:
             algorithm = NSGAII(problem, population = 100, generator = gen)
             def cb(a):
                 print(a.nfe, flush=True)
-            algorithm.run(25000, callback=cb)
+            algorithm.run(self.mo_eval, callback=cb)
 
             idxs = np.random.randint(0, len(algorithm.result), self.B)
             for i in idxs:
