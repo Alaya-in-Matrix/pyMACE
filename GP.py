@@ -26,7 +26,8 @@ class GP_MCMC:
         
         self.m.kern.variance       = np.var(self.train_y)
         self.m.kern.lengthscale    = np.std(self.train_x, 0)
-        self.m.likelihood.variance = 1e-2 * np.var(self.train_y)
+        self.m.likelihood.variance = np.maximum(2e-20, 1e-2 * np.var(self.train_y))
+        self.m.likelihood.variance.constrain_bounded(1e-20, 1e10)
 
         self.m.kern.variance.set_prior(GPy.priors.LogGaussian(0, 1))
         self.m.likelihood.variance.set_prior(GPy.priors.Gamma.from_EV(0.02, 4))

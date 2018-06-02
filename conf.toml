@@ -16,4 +16,4 @@ max_iter   = 1
 batch_size = 4
 num_cores  = 1
 use_sobol  = 1
-mo_eval    = 500
+mo_eval    = 2000

@@ -139,7 +139,7 @@ class MACE:
                 f.write('Tau = %g, eps = %g, kappa = %g, ystd = %g, ymean = %g\n' % (self.model.tau, self.model.eps, self.model.kappa, self.model.std, self.model.mean))
                 evaled_x  = self.dbx[-1*self.B:, :]
                 evaled_y  = self.dby[-1*self.B:]
-                evaled_pf = self.pf[-1*self.B:, :]
+                evaled_pf = self.pf[idxs]
 
                 for i in range(self.B):
                     predy, preds = self.model.predict(evaled_x[i, :]);
