@@ -21,6 +21,7 @@ num_cores  = conf["num_cores"]
 num_init   = conf["num_init"]
 var_name   = conf["var_name"]
 use_sobol  = conf["use_sobol"]
+warp       = conf["warp"]
 mo_eval    = conf["mo_eval"]
 
 os.system("rm -rf work")
@@ -46,7 +47,7 @@ print(f(lb))
 print(f(ub))
 
 
-optimizer = MACE(f, lb, ub, num_init, max_iter, batch_size, sobol_init = use_sobol, mo_eval = mo_eval);
+optimizer = MACE(f, lb, ub, num_init, max_iter, batch_size, sobol_init = use_sobol, warp = warp, mo_eval = mo_eval);
 optimizer.init()
 optimizer.optimize()
 

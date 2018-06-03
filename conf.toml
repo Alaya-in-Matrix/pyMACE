@@ -11,9 +11,10 @@ bounds   = [
     [-20, 20]
 ]
 var_name   = ["x1", "x2", "x3", "x4", "x5", "x6", "x7", "x8", "x9", "x10"]
-num_init   = 4
-max_iter   = 1
+num_init   = 100
+max_iter   = 100
 batch_size = 4
 num_cores  = 1
 use_sobol  = 1
-mo_eval    = 2000
+warp       = 1
+mo_eval    = 20000

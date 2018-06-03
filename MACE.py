@@ -8,7 +8,7 @@ from sobol_seq import i4_sobol_generate
 import os, sys
 
 class MACE:
-    def __init__(self, f, lb, ub, num_init, max_iter, B, debug=True, sobol_init=True, mo_eval = 25000):
+    def __init__(self, f, lb, ub, num_init, max_iter, B, debug=True, sobol_init=True, warp = False, mo_eval = 25000):
         """
         f: the objective function:
             input: D row vector
@@ -28,6 +28,7 @@ class MACE:
         self.B          = B
         self.debug      = debug
         self.sobol_init = sobol_init
+        self.warp       = warp
         self.mo_eval    = mo_eval
 
     def init(self):
@@ -81,7 +82,7 @@ class MACE:
         f           = open('opt.log', 'w');
         self.best_y = np.min(self.dby)
         for iter in range(self.max_iter):
-            self.model = GP_MCMC(self.dbx, self.dby, self.B, self.num_init)
+            self.model = GP_MCMC(self.dbx, self.dby, self.B, self.num_init, warp = self.warp)
             print("GP built")
             print(self.model.m)
 

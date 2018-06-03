@@ -2,10 +2,11 @@ import GPy
 from GPyOpt.util.general import get_quantiles
 import numpy as np
 from math import pow, log, sqrt
+import sys
 
 # TODO: standardize the training data
 class GP_MCMC:
-    def __init__(self, train_x, train_y, B, num_init):
+    def __init__(self, train_x, train_y, B, num_init, warp = False):
         
         self.mean = np.mean(train_y);
         self.std  = np.std(train_y);
@@ -16,9 +17,13 @@ class GP_MCMC:
         self.dim       = self.train_x.shape[1]
         self.B         = B
         self.num_init  = num_init
+        self.warp      = warp
 
-        kern           = GPy.kern.Matern52(input_dim = self.dim, ARD = True)
-        self.m         = GPy.models.GPRegression(self.train_x, self.train_y, kern)
+        kern = GPy.kern.Matern52(input_dim = self.dim, ARD = True)
+        if self.warp:
+            self.m = GPy.models.InputWarpedGP(self.train_x, self.train_y, kern)
+        else:
+            self.m = GPy.models.GPRegression(self.train_x, self.train_y, kern)
 
         # self.m.kern.variance.set_prior(GPy.priors.Gamma.from_EV(np.var(self.train_y), 120))
         # self.m.likelihood.variance.set_prior(GPy.priors.Gamma.from_EV(1e-2 * np.var(self.train_y), 4))
@@ -52,9 +57,12 @@ class GP_MCMC:
         self.ms = []
         for i in range(self.s.shape[0]):
             samp_kern = GPy.kern.Matern52(input_dim = self.dim, ARD = True)
-            samp_m    = GPy.models.GPRegression(self.train_x, self.train_y, samp_kern)
+            if self.warp:
+                samp_m = GPy.models.InputWarpedGP(self.train_x, self.train_y, samp_kern)
+            else:
+                samp_m = GPy.models.GPRegression(self.train_x, self.train_y, samp_kern)
             samp_m[:] = self.s[i]
-            samp_m._trigger_params_changed()
+            samp_m.parameters_changed()
             self.ms = np.append(self.ms, samp_m)
 
 
@@ -84,6 +92,14 @@ class GP_MCMC:
             m, v   = self.ms[i].predict(x.reshape(1, x.size))
             pys[i] = m[0][0]
             pss[i] = v[0][0]
+            # if(np.isnan(pys[i])):
+            #     print("Fuck")
+            #     print(self.ms[i])
+            #     print(self.s[i])
+            #     print(x.reshape(1, x.size))
+            #     print(self.train_x)
+            #     print(self.train_y)
+            #     sys.exit(1)
         pys = self.mean + (pys * self.std)
         pss = pss * (self.std**2)
         return pys, np.sqrt(pss)
