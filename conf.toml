@@ -16,4 +16,4 @@ batch_size = 4
 max_iter   = 100
 use_sobol  = 1
 warp       = 0
-mo_eval    = 25000
+mo_eval    = 10000
