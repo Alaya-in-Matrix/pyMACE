@@ -8,7 +8,7 @@ import toml
 import multiprocessing
 import sys
 import os
-
+np.set_printoptions(precision=6, linewidth=500)
 
 # argv = sys.argv[1:]
 conf = toml.load("conf.toml")
@@ -17,7 +17,6 @@ conf = toml.load("conf.toml")
 batch_size = conf["batch_size"]
 bounds     = np.array(conf["bounds"])
 max_iter   = conf["max_iter"]
-num_cores  = conf["num_cores"]
 num_init   = conf["num_init"]
 var_name   = conf["var_name"]
 use_sobol  = conf["use_sobol"]

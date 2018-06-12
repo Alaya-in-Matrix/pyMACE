@@ -44,7 +44,7 @@ class GP_MCMC:
         self.tau     = np.min(train_y)
 
         self.burnin             = 200
-        self.n_samples          = 30
+        self.n_samples          = 10
         self.subsample_interval = 10
         self.sample()
         

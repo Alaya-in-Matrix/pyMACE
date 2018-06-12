@@ -1,6 +1,6 @@
 from GP import GP_MCMC
 import numpy as np
-from platypus import NSGAII, MOEAD, Problem, Real, SPEA2, NSGAIII, Solution, InjectedPopulation
+from platypus import NSGAII, MOEAD, Problem, Real, SPEA2, NSGAIII, Solution, InjectedPopulation, Archive
 from math import pow, log, sqrt
 from scipy.special import erfc
 from scipy.optimize import fmin_l_bfgs_b
@@ -84,7 +84,7 @@ class MACE:
         for iter in range(self.max_iter):
             self.model = GP_MCMC(self.dbx, self.dby, self.B, self.num_init, warp = self.warp)
             print("GP built")
-            print(self.model.m)
+            print(self.model.m, flush=True)
 
             guess_x   = self.gen_guess()
             num_guess = guess_x.shape[0]
@@ -105,25 +105,30 @@ class MACE:
 
             problem.function = obj
             gen              = InjectedPopulation(init_s)
-            # algorithm        = MOEAD(problem, population_size=100, generator = gen)
-            # algorithm        = NSGAIII(problem, divisions_outer=12, generator = gen)
-            # algorithm        = CMAES(problem, epsilons=0.05, population_size=100, generator = gen)
-            algorithm = NSGAII(problem, population = 100, generator = gen)
+            arch             = Archive()
+            algorithm        = NSGAII(problem, population = 100, generator = gen, archive = arch)
             def cb(a):
-                print(a.nfe, flush=True)
+                print(a.nfe, len(a.archive), flush=True)
             algorithm.run(self.mo_eval, callback=cb)
 
-            idxs = np.random.randint(0, len(algorithm.result), self.B)
+            if len(algorithm.result) > self.B:
+                optimized = algorithm.result
+            else:
+                optimized = algorithm.population
+
+            idxs = np.arange(len(optimized))
+            idxs = np.random.permutation(idxs)
+            idxs = idxs[0:self.B]
             for i in idxs:
-                x = np.array(algorithm.result[i].variables)
+                x = np.array(optimized[i].variables)
                 y = self.f(x)
                 if y < self.best_y:
                     self.best_y = y
                     self.best_x = x
                 self.dbx = np.concatenate((self.dbx, x.reshape(1, x.size)), axis=0)
                 self.dby = np.concatenate((self.dby, y.reshape(1, 1)), axis=0)
-            pf       = np.array([s.objectives for s in algorithm.result])
-            ps       = np.array([s.variables  for s in algorithm.result])
+            pf       = np.array([s.objectives for s in optimized])
+            ps       = np.array([s.variables  for s in optimized])
             self.pf  = pf;
             self.ps  = ps;
             pf[:, 1] = np.exp(-1 * pf[:, 1]) # from -1*log_ei to ei
@@ -138,6 +143,7 @@ class MACE:
                 best_lcb, best_ei, best_pi = self.model.MACE_acq(self.best_x)
                 f.write('Best x,  LCB: %g, EI: %g, PI: %g\n' % (best_lcb[0], best_ei[0], best_pi[0]))
                 f.write('Tau = %g, eps = %g, kappa = %g, ystd = %g, ymean = %g\n' % (self.model.tau, self.model.eps, self.model.kappa, self.model.std, self.model.mean))
+                f.write('Hypers:\n' + str(self.model.s)  + '\n')
                 evaled_x  = self.dbx[-1*self.B:, :]
                 evaled_y  = self.dby[-1*self.B:]
                 evaled_pf = self.pf[idxs]

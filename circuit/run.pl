@@ -4,7 +4,7 @@ use warnings;
 use 5.010;
 
 my @params;
-my $prob = 7;
+my $prob = 5;
 $prob    = 3 * ($prob - 1) + 1;
 
 open my $param_f, "<", "./param" or die "Can't open param:$!\n";
