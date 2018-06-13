@@ -8,7 +8,7 @@ from sobol_seq import i4_sobol_generate
 import os, sys
 
 class MACE:
-    def __init__(self, f, lb, ub, num_init, max_iter, B, debug=True, sobol_init=True, warp = False, mo_eval = 25000):
+    def __init__(self, f, lb, ub, num_init, max_iter, B, debug=True, sobol_init=True, warp = False, mo_eval = 25000, mcmc = True):
         """
         f: the objective function:
             input: D row vector
@@ -30,6 +30,7 @@ class MACE:
         self.sobol_init = sobol_init
         self.warp       = warp
         self.mo_eval    = mo_eval
+        self.mcmc       = mcmc
 
     def init(self):
         self.dbx = np.zeros((self.num_init, self.dim))
@@ -51,10 +52,9 @@ class MACE:
         print('Initialized, best is %g' % self.best_y)
 
     def gen_guess(self):
-        num_guess     = np.minimum(10, len(self.model.ms));
+        num_guess     = 1 + len(self.model.ms)
         guess_x       = np.zeros((num_guess, self.dim))
         guess_x[0, :] = self.best_x
-        guess_x[1, :] = self.dbx[-1, :]
 
         def obj(x, m):
             m, _    = m.predict(x[None, :])
@@ -64,8 +64,8 @@ class MACE:
             return dmdx
 
         bounds = [(self.lb[i], self.ub[i]) for i in range(self.dim)]
-        for i in range(2, num_guess):
-            m  = self.model.ms[i]
+        for i in range(1, num_guess):
+            m  = self.model.ms[i-1]
             xx = self.best_x + np.random.randn(self.best_x.size).reshape(self.best_x.shape) * 1e-3
             def mobj(x):
                 return obj(x, m)
@@ -82,7 +82,7 @@ class MACE:
         f           = open('opt.log', 'w');
         self.best_y = np.min(self.dby)
         for iter in range(self.max_iter):
-            self.model = GP_MCMC(self.dbx, self.dby, self.B, self.num_init, warp = self.warp)
+            self.model = GP_MCMC(self.dbx, self.dby, self.B, self.num_init, warp = self.warp, mcmc = self.mcmc)
             print("GP built")
             print(self.model.m, flush=True)
 
@@ -143,7 +143,8 @@ class MACE:
                 best_lcb, best_ei, best_pi = self.model.MACE_acq(self.best_x)
                 f.write('Best x,  LCB: %g, EI: %g, PI: %g\n' % (best_lcb[0], best_ei[0], best_pi[0]))
                 f.write('Tau = %g, eps = %g, kappa = %g, ystd = %g, ymean = %g\n' % (self.model.tau, self.model.eps, self.model.kappa, self.model.std, self.model.mean))
-                f.write('Hypers:\n' + str(self.model.s)  + '\n')
+                if self.mcmc:
+                    f.write('Hypers:\n' + str(self.model.s)  + '\n')
                 evaled_x  = self.dbx[-1*self.B:, :]
                 evaled_y  = self.dby[-1*self.B:]
                 evaled_pf = self.pf[idxs]

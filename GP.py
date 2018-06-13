@@ -6,7 +6,7 @@ import sys
 
 # TODO: standardize the training data
 class GP_MCMC:
-    def __init__(self, train_x, train_y, B, num_init, warp = False):
+    def __init__(self, train_x, train_y, B, num_init, warp = False, mcmc = True):
         
         self.mean = np.mean(train_y);
         self.std  = np.std(train_y);
@@ -18,6 +18,7 @@ class GP_MCMC:
         self.B         = B
         self.num_init  = num_init
         self.warp      = warp
+        self.mcmc      = mcmc
 
         kern = GPy.kern.Matern52(input_dim = self.dim, ARD = True)
         if self.warp:
@@ -49,21 +50,26 @@ class GP_MCMC:
         self.sample()
         
     def sample(self):
-        self.m.optimize(max_iters=200, messages=False)
-        hmc     = GPy.inference.mcmc.HMC(self.m,stepsize=5e-2)
-        s       = hmc.sample(num_samples=self.burnin) # Burnin
-        s       = hmc.sample(num_samples=self.n_samples * self.subsample_interval)
-        self.s  = s[0::self.subsample_interval]
-        self.ms = []
-        for i in range(self.s.shape[0]):
-            samp_kern = GPy.kern.Matern52(input_dim = self.dim, ARD = True)
-            if self.warp:
-                samp_m = GPy.models.InputWarpedGP(self.train_x, self.train_y, samp_kern)
-            else:
-                samp_m = GPy.models.GPRegression(self.train_x, self.train_y, samp_kern)
-            samp_m[:] = self.s[i]
-            samp_m.parameters_changed()
-            self.ms = np.append(self.ms, samp_m)
+        if not self.mcmc:
+            self.s  = np.array(np.array(self.m[:]))
+            self.s  = self.s.reshape(1, self.s.size)
+            self.ms = np.array([self.m])
+        else:
+            self.m.optimize(max_iters=200, messages=False)
+            hmc     = GPy.inference.mcmc.HMC(self.m,stepsize=5e-2)
+            s       = hmc.sample(num_samples=self.burnin) # Burnin
+            s       = hmc.sample(num_samples=self.n_samples * self.subsample_interval)
+            self.s  = s[0::self.subsample_interval]
+            self.ms = []
+            for i in range(self.s.shape[0]):
+                samp_kern = GPy.kern.Matern52(input_dim = self.dim, ARD = True)
+                if self.warp:
+                    samp_m = GPy.models.InputWarpedGP(self.train_x, self.train_y, samp_kern)
+                else:
+                    samp_m = GPy.models.GPRegression(self.train_x, self.train_y, samp_kern)
+                samp_m[:] = self.s[i]
+                samp_m.parameters_changed()
+                self.ms = np.append(self.ms, samp_m)
 
 
     def predict_sample(self, x, hyp_vec):
@@ -85,21 +91,9 @@ class GP_MCMC:
         pys         = np.zeros((num_samples, 1));
         pss         = np.zeros((num_samples, 1));
         for i in range(num_samples):
-            # hyp       = self.s[i]
-            # self.m[:] = hyp
-            # self.m._trigger_params_changed()
-            # m, v = self.m.predict(x.reshape(1, x.size))
             m, v   = self.ms[i].predict(x.reshape(1, x.size))
             pys[i] = m[0][0]
             pss[i] = v[0][0]
-            # if(np.isnan(pys[i])):
-            #     print("Fuck")
-            #     print(self.ms[i])
-            #     print(self.s[i])
-            #     print(x.reshape(1, x.size))
-            #     print(self.train_x)
-            #     print(self.train_y)
-            #     sys.exit(1)
         pys = self.mean + (pys * self.std)
         pss = pss * (self.std**2)
         return pys, np.sqrt(pss)

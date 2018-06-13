@@ -22,6 +22,7 @@ var_name   = conf["var_name"]
 use_sobol  = conf["use_sobol"]
 warp       = conf["warp"]
 mo_eval    = conf["mo_eval"]
+mcmc       = conf["mcmc"]
 
 os.system("rm -rf work")
 os.system("mkdir work")
@@ -46,7 +47,7 @@ print(f(lb))
 print(f(ub))
 
 
-optimizer = MACE(f, lb, ub, num_init, max_iter, batch_size, sobol_init = use_sobol, warp = warp, mo_eval = mo_eval);
+optimizer = MACE(f, lb, ub, num_init, max_iter, batch_size, sobol_init = use_sobol, warp = warp, mo_eval = mo_eval, mcmc = mcmc);
 optimizer.init()
 optimizer.optimize()
 
