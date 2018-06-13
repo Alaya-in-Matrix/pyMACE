@@ -50,12 +50,12 @@ class GP_MCMC:
         self.sample()
         
     def sample(self):
+        self.m.optimize(max_iters=200, messages=False)
         if not self.mcmc:
             self.s  = np.array(np.array(self.m[:]))
             self.s  = self.s.reshape(1, self.s.size)
             self.ms = np.array([self.m])
         else:
-            self.m.optimize(max_iters=200, messages=False)
             hmc     = GPy.inference.mcmc.HMC(self.m,stepsize=5e-2)
             s       = hmc.sample(num_samples=self.burnin) # Burnin
             s       = hmc.sample(num_samples=self.n_samples * self.subsample_interval)

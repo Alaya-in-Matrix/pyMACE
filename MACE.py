@@ -143,8 +143,7 @@ class MACE:
                 best_lcb, best_ei, best_pi = self.model.MACE_acq(self.best_x)
                 f.write('Best x,  LCB: %g, EI: %g, PI: %g\n' % (best_lcb[0], best_ei[0], best_pi[0]))
                 f.write('Tau = %g, eps = %g, kappa = %g, ystd = %g, ymean = %g\n' % (self.model.tau, self.model.eps, self.model.kappa, self.model.std, self.model.mean))
-                if self.mcmc:
-                    f.write('Hypers:\n' + str(self.model.s)  + '\n')
+                f.write('Hypers:\n' + str(self.model.s)  + '\n')
                 evaled_x  = self.dbx[-1*self.B:, :]
                 evaled_y  = self.dby[-1*self.B:]
                 evaled_pf = self.pf[idxs]
