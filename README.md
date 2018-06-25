@@ -15,4 +15,5 @@ The origin MACE algorithm, re-implemented in python
 
 ## TODO
 
-Combine MACE with other parallel strategy like kriging believer or local penalization
+- Improve the interface
+- Combine MACE with other parallel strategy like kriging believer or local penalization
